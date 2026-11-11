@@ -65,8 +65,10 @@ go build -ldflags="-s -w" -o "C:\Users\jairs\bin\codexseek.exe" ./cmd/codexseek
 ```powershell
 codexseek --version
 codexseek doctor
+codexseek balance
+codexseek recap
 codexseek models
-codexseek sync-upstream
+codexseek update
 codexseek exec --skip-git-repo-check -s workspace-write -C "C:\caminho\projeto" "Tarefa"
 codexseek --pro exec --skip-git-repo-check -s workspace-write -C "C:\caminho\projeto" "Tarefa complexa"
 ```
@@ -75,11 +77,12 @@ codexseek --pro exec --skip-git-repo-check -s workspace-write -C "C:\caminho\pro
 
 ## 5. Local de Instalação e Atalhos
 - **Executável Oficial no PATH:** `C:\Users\jairs\bin\codexseek.exe`
+- **Atalho na Área de Trabalho:** `C:\Users\jairs\Desktop\CodexSeek by Jair Lima.lnk` (apontando para `C:\Users\jairs\bin\codexseek.exe`).
 - **Função Nativa nos Perfis PowerShell:** Registrada em `C:\Users\jairs\Documents\PowerShell\Microsoft.PowerShell_profile.ps1` e `C:\Users\jairs\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1` chamando diretamente `C:\Users\jairs\bin\codexseek.exe` (sem `.cmd`).
-- **Diretório de Estado Isolado:** `C:\Users\jairs\.codexseek\` (contém o catálogo `deepseek_catalog.json` e o log de auditoria `sync-upstream.log`).
+- **Diretório de Estado Isolado:** `C:\Users\jairs\.codexseek\` (contém o catálogo `deepseek_catalog.json`, cache de saldo `last-balance.json`, snapshot `last-recap.json`, histórico `recap-history.log`, auditoria H2H `h2h-usage.jsonl` e log `sync-upstream.log`).
 
 ---
 
 ## 6. Estado Atual e Próximos Passos
-- **Estado Atual (2026-11-10):** Concluído, testado e homologado em produção. Sincronização automática validada em tempo real atualizando o motor upstream de `0.167.0` para `0.167.1` e regenerando o catálogo `deepseek_catalog_codex-cli_0.167.1.json`. Repositório público publicado no GitHub e integrado ao `SPEC.md` do Protocolo H2H.
+- **Estado Atual (2026-11-11, v1.1.0):** Concluído, testado e homologado em produção. Inclui consulta de saldo em tempo real (`codexseek balance` / `codexseek saldo`), Modo Recap automático com saldo (`codexseek recap`, `tui.auto_recap=true`, `/recap` e hook `turn-ended`), auditoria automática H2H (`~/.codexseek/h2h-usage.jsonl`), limpeza preventiva de pastas temporárias órfãs do NPM (`.codex-*`) no `codexseek update`, e GitHub Release com binários pré-compilados.
 - **Problemas Conhecidos:** Nenhum. O atraso de ~25s que ocorria ao carregar plugins do Codex Desktop foi 100% eliminado no modo `exec` via injeção automática de `--ignore-user-config` + `-c windows.sandbox="unelevated"`.

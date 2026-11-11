@@ -33,6 +33,29 @@ func main() {
 		case "doctor":
 			os.Exit(sync.RunDoctor())
 
+		case "balance", "saldo":
+			shortOnly := false
+			jsonOut := false
+			for _, a := range args[1:] {
+				if a == "--short" || a == "-s" {
+					shortOnly = true
+				}
+				if a == "--json" {
+					jsonOut = true
+				}
+			}
+			os.Exit(sync.RunBalance(shortOnly, jsonOut))
+
+		case "recap":
+			os.Exit(sync.RunRecap())
+
+		case "turn-ended":
+			payload := ""
+			if len(args) > 1 {
+				payload = args[len(args)-1]
+			}
+			os.Exit(sync.HandleTurnEndedNotify(payload))
+
 		case "models":
 			fmt.Printf("=== %s — Modelos DeepSeek Disponíveis ===\n", config.AppName)
 			for _, m := range catalog.DefaultModels() {
@@ -66,12 +89,13 @@ func main() {
 				fmt.Println(string(b))
 			} else {
 				fmt.Printf("=== %s — Sincronização Upstream Concluída ===\n", config.AppName)
-				fmt.Printf("  Versão anterior : %s\n", res.PreviousVersion)
-				fmt.Printf("  Versão atual    : %s\n", res.CurrentVersion)
-				fmt.Printf("  Última no NPM   : %s\n", res.LatestNPM)
-				fmt.Printf("  Atualizado agora: %v\n", res.Updated)
-				fmt.Printf("  Catálogo gerado : %s\n", res.CatalogPath)
-				fmt.Printf("  Log de auditoria: %s\n", res.LogFile)
+				fmt.Printf("  Versão anterior      : %s\n", res.PreviousVersion)
+				fmt.Printf("  Versão atual         : %s\n", res.CurrentVersion)
+				fmt.Printf("  Última no NPM        : %s\n", res.LatestNPM)
+				fmt.Printf("  Atualizado agora     : %v\n", res.Updated)
+				fmt.Printf("  Temporários limpos   : %d\n", res.CleanedTempDirs)
+				fmt.Printf("  Catálogo gerado      : %s\n", res.CatalogPath)
+				fmt.Printf("  Log de auditoria     : %s\n", res.LogFile)
 			}
 			os.Exit(0)
 
@@ -97,9 +121,11 @@ Atalhos exclusivos do CodexSeek:
   --flash                   Usa o modelo rápido DeepSeek V4.1 Flash (deepseek-flash, padrão)
   --pro                     Usa o modelo de raciocínio profundo DeepSeek V4 Pro (deepseek-v4-pro)
   -m <flash|pro|chat|r1>    Seleciona o modelo DeepSeek por alias curto ou slug oficial
+  codexseek balance|saldo   Exibe o saldo atual da conta DeepSeek API em USD
+  codexseek recap           Exibe o recap consolidado da sessão + histórico H2H + saldo DeepSeek
   codexseek models          Lista os modelos DeepSeek pré-configurados e suas capacidades
-  codexseek doctor          Executa diagnóstico completo (binário, catálogo, chave e API)
-  codexseek sync-upstream   Atualiza automaticamente o motor Codex CLI e regenera o catálogo
+  codexseek doctor          Executa diagnóstico completo (binário, catálogo, chave, API e saldo)
+  codexseek update          Limpa temporários, atualiza o motor Codex CLI e regenera o catálogo
 
 Abaixo seguem os comandos e opções nativas do motor Codex CLI:
 --------------------------------------------------------------------------------

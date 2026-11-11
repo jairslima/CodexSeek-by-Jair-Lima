@@ -1,7 +1,7 @@
 # Especificação Técnica (SPEC.md): CodexSeek by Jair Lima
 
 **Projeto:** CodexSeek by Jair Lima  
-**Versão:** 1.0.0  
+**Versão:** 1.1.0  
 **Autor:** Jair Lima  
 **Licença:** MIT (código próprio do CodexSeek) e Apache 2.0 (atribuição ao motor upstream OpenAI Codex CLI)  
 **Repositório:** `https://github.com/jairslima/CodexSeek-by-Jair-Lima` (Público por solicitação explícita do autor)
@@ -26,8 +26,10 @@ Construir e manter um fork/overlay nativo e público chamado **CodexSeek by Jair
    - `deepseek-reasoner` (DeepSeek Reasoner, 128k tokens)
    - `apply_patch_tool_type = null` e `tool_mode = null` (garantindo chamadas de função JSON universais em vez da gramática `freeform` proprietária da OpenAI).
 4. **Resolução Segura de Credenciais (`internal/config`):** Leitura em memória da variável `DEEPSEEK_API_KEY` a partir do ambiente, `~/.codexseek/.env` ou `~/.api_keys/credentials.env`, com mascaramento obrigatório (`8 primeiros caracteres + "..." + 4 últimos`) em qualquer diagnóstico.
-5. **Sincronização Upstream Automatizada (`codexseek sync-upstream`):** Verificação e atualização automática do pacote `@openai/codex@latest` via NPM e reconstrução imediata do catálogo de modelos compatível com a versão recém-instalada, além de workflow diário no GitHub Actions (`.github/workflows/sync-upstream.yml`).
-6. **Integração ao Protocolo H2H:** Manifesto oficial `codexseek` documentado para delegação síncrona entre harnesses.
+5. **Sincronização Upstream Automatizada (`codexseek sync-upstream` / `codexseek update`):** Limpeza automática de diretórios temporários órfãos do NPM no Windows (`.codex-*`), verificação e atualização automática do pacote `@openai/codex@latest` via NPM e reconstrução imediata do catálogo de modelos compatível com a versão recém-instalada, além de workflow diário no GitHub Actions (`.github/workflows/sync-upstream.yml`).
+6. **Consulta de Saldo DeepSeek (`codexseek balance` / `codexseek saldo`):** Consulta direta ao endpoint `GET https://api.deepseek.com/user/balance` com cache resiliente em `~/.codexseek/last-balance.json` e injeção em `$env:CODEXSEEK_BALANCE` para acesso imediato mesmo dentro da sandbox restrita do Codex.
+7. **Modo Recap Automático com Saldo (`codexseek recap` + `tui.auto_recap=true` + `/recap`):** Habilitação nativa do modo Recap da TUI do Codex, callback de fim de turno (`notify = ["codexseek.exe", "turn-ended"]`), log automático de auditoria H2H (`~/.codexseek/h2h-usage.jsonl`) e inclusão automática do saldo da DeepSeek no recap.
+8. **Integração ao Protocolo H2H:** Manifesto oficial `codexseek` documentado para delegação síncrona entre harnesses.
 
 ### Fora do Escopo
 - Modificar ou sobrescrever o arquivo `~/.codex/config.toml` usado pelo `codex` original da OpenAI (o `codex` e o `codexseek` coexistem na mesma máquina sem interferência mútua).

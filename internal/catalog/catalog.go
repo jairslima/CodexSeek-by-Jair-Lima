@@ -1,7 +1,8 @@
 // Package catalog extracts and adapts the embedded model catalog from the
 // upstream Codex CLI binary so DeepSeek models (deepseek-flash, deepseek-v4-pro,
 // deepseek-chat, deepseek-reasoner) run natively with 1M context window,
-// zero fallback metadata warnings, and compatible tool definitions.
+// zero fallback metadata warnings, compatible tool definitions, and built-in
+// Recap + Balance instructions.
 //
 // Project: CodexSeek by Jair Lima
 // Author: Jair Lima
@@ -68,7 +69,7 @@ func DefaultModels() []DeepSeekModelSpec {
 // ~/.codexseek/deepseek_catalog_<version>.json by extracting the exact schema
 // from the installed Codex binary. This guarantees 100% forward compatibility
 // whenever the upstream Codex CLI updates its internal Rust struct schema.
-func EnsureCatalog(codexBinPath, codexVersion, stateDir string) (string, error) {
+func EnsureCatalog(codexBinPath, codexVersion, stateDir string, forceRebuild bool) (string, error) {
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create state dir: %w", err)
 	}
@@ -83,14 +84,16 @@ func EnsureCatalog(codexBinPath, codexVersion, stateDir string) (string, error) 
 		safeVer = "latest"
 	}
 
-	catalogPath := filepath.Join(stateDir, fmt.Sprintf("deepseek_catalog_%s.json", safeVer))
-	if info, err := os.Stat(catalogPath); err == nil && info.Size() > 1024 {
-		return catalogPath, nil
+	// Schema revision v3 includes Recap + Balance instructions (with CODEXSEEK_BALANCE env & codexseek.exe balance --short)
+	catalogPath := filepath.Join(stateDir, fmt.Sprintf("deepseek_catalog_%s_r3.json", safeVer))
+	if !forceRebuild {
+		if info, err := os.Stat(catalogPath); err == nil && info.Size() > 1024 {
+			return catalogPath, nil
+		}
 	}
 
 	rawCatalog, err := extractEmbeddedCatalogFromBinary(codexBinPath)
 	if err != nil {
-		// Fallback to minimal valid catalog if binary extraction fails
 		rawCatalog = buildFallbackTemplate()
 	}
 
@@ -103,7 +106,6 @@ func EnsureCatalog(codexBinPath, codexVersion, stateDir string) (string, error) 
 		return "", fmt.Errorf("failed to write catalog file: %w", err)
 	}
 
-	// Also write a stable symlink/copy at deepseek_catalog.json
 	latestPath := filepath.Join(stateDir, "deepseek_catalog.json")
 	_ = os.WriteFile(latestPath, adaptedBytes, 0644)
 
@@ -126,7 +128,6 @@ func extractEmbeddedCatalogFromBinary(binPath string) (map[string]any, error) {
 		return nil, fmt.Errorf("embedded catalog marker not found in binary")
 	}
 
-	// Walk backwards to find the outer `{` before `"models": [`
 	searchStart := pos - 200
 	if searchStart < 0 {
 		searchStart = 0
@@ -142,7 +143,6 @@ func extractEmbeddedCatalogFromBinary(binPath string) (map[string]any, error) {
 	}
 	start := searchStart + outerBrace
 
-	// Find matching closing brace
 	depth := 0
 	inString := false
 	escaped := false
@@ -185,14 +185,19 @@ func extractEmbeddedCatalogFromBinary(binPath string) (map[string]any, error) {
 	return parsed, nil
 }
 
+const codexSeekRecapInstructions = `
+
+## CodexSeek Recap & DeepSeek Balance Instructions (by Jair Lima)
+Whenever the user invokes ` + "`$recap`" + `, ` + "`/recap`" + `, asks for a recap/resumo da sessão, or when finishing a multi-step operational task, include a concise single-line recap at the end in Brazilian Portuguese with the live DeepSeek account balance (available in the environment variable ` + "`$env:CODEXSEEK_BALANCE`" + ` or by running ` + "`codexseek.exe balance --short`" + `):
+` + "`recap: <o que foi concluído>. Próximo passo: <ação concreta ou decisão pendente>. [Saldo DeepSeek: <valor USD>]`" + `
+`
+
 func buildDeepSeekCatalogJSON(upstream map[string]any) ([]byte, error) {
 	modelsSlice, ok := upstream["models"].([]any)
 	if !ok || len(modelsSlice) == 0 {
 		return nil, fmt.Errorf("upstream catalog has no models array")
 	}
 
-	// Prefer gpt-5.5 as base template because its tool_mode is null (standard shell_command)
-	// rather than OpenAI-internal code_mode_only.
 	var baseTemplate map[string]any
 	for _, item := range modelsSlice {
 		if m, ok := item.(map[string]any); ok {
@@ -228,9 +233,6 @@ func buildDeepSeekCatalogJSON(upstream map[string]any) ([]byte, error) {
 		clone["max_context_window"] = spec.ContextWindow
 		clone["priority"] = spec.Priority
 
-		// Crucial adaptations for DeepSeek compatibility:
-		// 1. Set apply_patch_tool_type to nil so Codex uses standard JSON function calling
-		//    instead of OpenAI's proprietary freeform grammar.
 		clone["apply_patch_tool_type"] = nil
 		clone["tool_mode"] = nil
 		clone["prefer_websockets"] = false
@@ -239,7 +241,6 @@ func buildDeepSeekCatalogJSON(upstream map[string]any) ([]byte, error) {
 		clone["upgrade"] = nil
 		clone["availability_nux"] = nil
 
-		// Adapt system prompt branding and Windows PowerShell guidance
 		if mm, ok := clone["model_messages"].(map[string]any); ok && mm != nil {
 			if tmpl, ok := mm["instructions_template"].(string); ok && tmpl != "" {
 				tmpl = strings.ReplaceAll(
@@ -252,7 +253,7 @@ func buildDeepSeekCatalogJSON(upstream map[string]any) ([]byte, error) {
 					"You are Codex, an agent based on GPT-6.",
 					fmt.Sprintf("You are CodexSeek (by Jair Lima), an advanced coding agent powered by %s (%s) on the Codex harness.", spec.DisplayName, spec.Slug),
 				)
-				mm["instructions_template"] = tmpl
+				mm["instructions_template"] = tmpl + codexSeekRecapInstructions
 			}
 		}
 
@@ -314,7 +315,7 @@ func buildFallbackTemplate() map[string]any {
 				"upgrade":                nil,
 				"priority":               1,
 				"model_messages": map[string]any{
-					"instructions_template":   "You are CodexSeek (by Jair Lima), a coding agent powered by DeepSeek.",
+					"instructions_template":   "You are CodexSeek (by Jair Lima), a coding agent powered by DeepSeek." + codexSeekRecapInstructions,
 					"persistent_instructions": nil,
 					"tools":                   nil,
 					"approvals":               nil,

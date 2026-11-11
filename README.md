@@ -75,10 +75,17 @@ go build -ldflags="-s -w" -o /usr/local/bin/codexseek ./cmd/codexseek
 
 ## Como Usar
 
-### Diagnóstico de Saúde (`doctor`)
-Verifica o binário nativo do Codex, o catálogo JSON da DeepSeek, a chave mascarada e a conectividade ao vivo com a API da DeepSeek:
+### Diagnóstico de Saúde (`doctor`) e Saldo (`balance` / `saldo`)
+Verifica o binário nativo do Codex, o catálogo JSON da DeepSeek, a chave mascarada, a conectividade ao vivo e o **saldo atual em USD da conta DeepSeek**:
 ```bash
 codexseek doctor
+codexseek balance   # ou: codexseek saldo | codexseek balance --short
+```
+
+### Modo Recap Automático e Recap da Sessão (`recap`)
+O **CodexSeek** habilita por padrão o **Automatic Recap** na TUI (`tui.auto_recap = true` e comando `/recap`), registra snapshots ao final de cada turno (`turn-ended`) e oferece o comando direto `codexseek recap` com o resumo das últimas tarefas, auditoria H2H (`~/.codexseek/h2h-usage.jsonl`) e o saldo atualizado da DeepSeek:
+```bash
+codexseek recap
 ```
 
 ### Listar Modelos Configurados (`models`)

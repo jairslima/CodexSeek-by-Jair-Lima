@@ -1,28 +1,45 @@
 // Package runner orchestrates the execution of the upstream Codex CLI binary
 // configured as CodexSeek by Jair Lima, injecting the DeepSeek model provider,
-// custom 1M-context model catalog, Windows sandbox adjustments, and H2H flags.
+// custom 1M-context model catalog, Windows sandbox adjustments, auto_recap,
+// and H2H usage audit logging.
 //
 // Project: CodexSeek by Jair Lima
 // Author: Jair Lima
 package runner
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/jairslima/CodexSeek-by-Jair-Lima/internal/catalog"
 	"github.com/jairslima/CodexSeek-by-Jair-Lima/internal/config"
+	"github.com/jairslima/CodexSeek-by-Jair-Lima/internal/sync"
 )
+
+// UsageLogRecord represents a single execution entry in ~/.codexseek/h2h-usage.jsonl
+// per Section 10 of the H2H Protocol specification.
+type UsageLogRecord struct {
+	Timestamp   string  `json:"timestamp"`
+	Mode        string  `json:"mode"`
+	Model       string  `json:"model"`
+	WorkDir     string  `json:"workdir"`
+	DurationSec float64 `json:"duration_sec"`
+	ExitCode    int     `json:"exit_code"`
+	PromptBrief string  `json:"prompt_brief,omitempty"`
+}
 
 // TransformArgs inspects the user-provided CLI arguments and injects the
 // CodexSeek overlay flags (DeepSeek provider, catalog JSON, model alias resolution,
-// and fast headless config isolation when running `exec`).
-func TransformArgs(rawArgs []string, catalogPath string) []string {
+// tui.auto_recap=true, and fast headless config isolation when running `exec`).
+func TransformArgs(rawArgs []string, catalogPath string) ([]string, string, string) {
 	selectedModel := config.DefaultModel
 	if envModel := strings.TrimSpace(os.Getenv("CODEXSEEK_MODEL")); envModel != "" {
 		selectedModel = config.ResolveModelAlias(envModel)
@@ -33,6 +50,7 @@ func TransformArgs(rawArgs []string, catalogPath string) []string {
 	hasIgnoreUserConfig := false
 	isExecSubcommand := false
 	execSubcommandIdx := -1
+	mode := "interactive"
 
 	for i := 0; i < len(rawArgs); i++ {
 		arg := rawArgs[i]
@@ -65,19 +83,22 @@ func TransformArgs(rawArgs []string, catalogPath string) []string {
 		case (arg == "exec" || arg == "e" || arg == "review") && !isExecSubcommand:
 			isExecSubcommand = true
 			execSubcommandIdx = len(cleaned)
+			mode = arg
 		}
 
 		cleaned = append(cleaned, arg)
 	}
 
-	// Build top-level overlay flags
 	escapedCatalogPath := strings.ReplaceAll(catalogPath, `\`, `\\`)
 	baseURL := config.DefaultBaseURL
 	if customURL := strings.TrimSpace(os.Getenv("CODEXSEEK_BASE_URL")); customURL != "" {
 		baseURL = customURL
 	}
 
-	overlayFlags := make([]string, 0, 18)
+	selfExe, _ := os.Executable()
+	escapedSelfExe := strings.ReplaceAll(selfExe, `\`, `\\`)
+
+	overlayFlags := make([]string, 0, 24)
 	if !hasNoDaemon {
 		overlayFlags = append(overlayFlags, "--no-daemon")
 	}
@@ -90,28 +111,28 @@ func TransformArgs(rawArgs []string, catalogPath string) []string {
 		"-c", fmt.Sprintf(`model_providers.deepseek.base_url="%s"`, baseURL),
 		"-c", fmt.Sprintf(`model_providers.deepseek.env_key="%s"`, config.EnvKeyName),
 		"-c", `model_providers.deepseek.wire_api="responses"`,
+		"-c", `tui.auto_recap=true`,
 	)
 
+	if selfExe != "" {
+		overlayFlags = append(overlayFlags,
+			"-c", fmt.Sprintf(`notify=["%s", "turn-ended"]`, escapedSelfExe),
+		)
+	}
+
 	if runtime.GOOS == "windows" {
-		// Ensure Windows workspace-write works cleanly without requiring Desktop MXC pipe
 		overlayFlags = append(overlayFlags, "-c", `windows.sandbox="unelevated"`)
 	}
 
-	// If running non-interactively via `exec`, inject `--ignore-user-config` right after `exec`
-	// unless the user explicitly passed `--use-codex-config` or `--ignore-user-config`.
-	// This prevents 25-second hangs caused by Codex Desktop MCP plugins (`node_repl`) and
-	// `approvals_reviewer = "auto_review"`.
 	if isExecSubcommand && !hasIgnoreUserConfig && os.Getenv("CODEXSEEK_KEEP_USER_CONFIG") != "1" {
 		withExecFlags := make([]string, 0, len(cleaned)+2)
 		withExecFlags = append(withExecFlags, cleaned[:execSubcommandIdx+1]...)
-		// Only add --ignore-user-config for `exec` / `e` (not `review` if unsupported)
 		if cleaned[execSubcommandIdx] == "exec" || cleaned[execSubcommandIdx] == "e" {
 			withExecFlags = append(withExecFlags, "--ignore-user-config")
 		}
 		withExecFlags = append(withExecFlags, cleaned[execSubcommandIdx+1:]...)
 		cleaned = withExecFlags
 	} else {
-		// In interactive TUI mode, override service_tier and approvals_reviewer so user config doesn't conflict
 		overlayFlags = append(overlayFlags,
 			"-c", `approvals_reviewer="user"`,
 		)
@@ -120,10 +141,10 @@ func TransformArgs(rawArgs []string, catalogPath string) []string {
 	finalArgs := make([]string, 0, len(overlayFlags)+len(cleaned))
 	finalArgs = append(finalArgs, overlayFlags...)
 	finalArgs = append(finalArgs, cleaned...)
-	return finalArgs
+	return finalArgs, selectedModel, mode
 }
 
-// Run executes the upstream Codex CLI binary with the CodexSeek overlay.
+// Run executes the upstream Codex CLI binary with the CodexSeek overlay and logs H2H usage.
 func Run(rawArgs []string) (int, error) {
 	codexBin, err := config.FindUpstreamCodexBinary()
 	if err != nil {
@@ -141,30 +162,37 @@ func Run(rawArgs []string) (int, error) {
 	}
 
 	upstreamVer := config.GetUpstreamVersion(codexBin)
-	catalogPath, err := catalog.EnsureCatalog(codexBin, upstreamVer, stateDir)
+	catalogPath, err := catalog.EnsureCatalog(codexBin, upstreamVer, stateDir, false)
 	if err != nil {
 		return 1, fmt.Errorf("erro ao preparar catálogo de modelos DeepSeek: %w", err)
 	}
 
-	finalArgs := TransformArgs(rawArgs, catalogPath)
+	// Pre-fetch and cache DeepSeek balance before entering the Codex sandbox
+	cachedBalanceSummary := ""
+	if bal, balErr := sync.FetchDeepSeekBalance(apiKey); balErr == nil {
+		cachedBalanceSummary = sync.FormatBalanceSummary(bal)
+	}
+
+	finalArgs, selectedModel, mode := TransformArgs(rawArgs, catalogPath)
 
 	cmd := exec.Command(codexBin, finalArgs...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	// Inject DEEPSEEK_API_KEY into the child process environment in memory only
 	env := os.Environ()
-	filteredEnv := make([]string, 0, len(env)+2)
+	filteredEnv := make([]string, 0, len(env)+3)
 	for _, kv := range env {
-		if !strings.HasPrefix(kv, config.EnvKeyName+"=") {
+		if !strings.HasPrefix(kv, config.EnvKeyName+"=") && !strings.HasPrefix(kv, "CODEXSEEK_BALANCE=") {
 			filteredEnv = append(filteredEnv, kv)
 		}
 	}
 	filteredEnv = append(filteredEnv, fmt.Sprintf("%s=%s", config.EnvKeyName, apiKey))
+	if cachedBalanceSummary != "" {
+		filteredEnv = append(filteredEnv, fmt.Sprintf("CODEXSEEK_BALANCE=%s", cachedBalanceSummary))
+	}
 	cmd.Env = filteredEnv
 
-	// Forward termination signals cleanly
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -176,11 +204,63 @@ func Run(rawArgs []string) (int, error) {
 	}()
 	defer signal.Stop(sigChan)
 
-	if err := cmd.Run(); err != nil {
+	startTime := time.Now()
+	err = cmd.Run()
+	duration := time.Since(startTime).Seconds()
+
+	exitCode := 0
+	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			return exitErr.ExitCode(), nil
+			exitCode = exitErr.ExitCode()
+			err = nil
+		} else {
+			exitCode = 1
 		}
-		return 1, err
 	}
-	return 0, nil
+
+	// Record H2H usage audit entry
+	recordUsageLog(stateDir, mode, selectedModel, rawArgs, duration, exitCode)
+
+	return exitCode, err
+}
+
+func recordUsageLog(stateDir, mode, model string, rawArgs []string, durationSec float64, exitCode int) {
+	wd, _ := os.Getwd()
+	brief := ""
+	for i, a := range rawArgs {
+		if (a == "-C" || a == "--cd") && i+1 < len(rawArgs) {
+			wd = rawArgs[i+1]
+		}
+	}
+	if len(rawArgs) > 0 {
+		last := rawArgs[len(rawArgs)-1]
+		if !strings.HasPrefix(last, "-") && last != "exec" && last != "e" {
+			brief = last
+			if len([]rune(brief)) > 120 {
+				brief = string([]rune(brief)[:120]) + "..."
+			}
+		}
+	}
+
+	rec := UsageLogRecord{
+		Timestamp:   time.Now().Format(time.RFC3339),
+		Mode:        mode,
+		Model:       model,
+		WorkDir:     wd,
+		DurationSec: float64(int(durationSec*100)) / 100,
+		ExitCode:    exitCode,
+		PromptBrief: brief,
+	}
+
+	b, err := json.Marshal(rec)
+	if err != nil {
+		return
+	}
+	logFile := filepath.Join(stateDir, "h2h-usage.jsonl")
+	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = f.Write(append(b, '\n'))
 }

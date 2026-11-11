@@ -18,8 +18,10 @@ Em vez de manter um fork estático do código Rust que sofreria conflitos consta
 - Qualquer exibição de diagnóstico (`codexseek doctor`) aplica mascaramento estrito (`8 primeiros caracteres + "..." + 4 últimos`).
 
 ## 3. Comandos Principais
-- `codexseek doctor`: Diagnóstico completo de saúde e conectividade HTTP 200 com a DeepSeek.
+- `codexseek doctor`: Diagnóstico completo de saúde, conectividade HTTP 200 e saldo ao vivo da DeepSeek.
+- `codexseek balance` (ou `codexseek saldo`): Exibe o saldo atual em USD da conta DeepSeek API (com cache local em `~/.codexseek/last-balance.json` para funcionamento dentro da sandbox).
+- `codexseek recap`: Exibe o recap consolidado da sessão, histórico das últimas execuções H2H (`~/.codexseek/h2h-usage.jsonl`), última resposta da sessão e saldo atual da DeepSeek. Na TUI, `tui.auto_recap=true` e `/recap` já vêm ativados por padrão com `$env:CODEXSEEK_BALANCE`.
 - `codexseek models`: Lista os modelos DeepSeek configurados no catálogo.
-- `codexseek sync-upstream`: Atualiza o motor Codex CLI para a última versão e regenera o catálogo.
+- `codexseek update` (ou `codexseek sync-upstream`): Limpa diretórios temporários órfãos `.codex-*`, atualiza o motor Codex CLI para a última versão e regenera o catálogo.
 - `codexseek exec --skip-git-repo-check -s workspace-write -C "<dir>" "<tarefa>"`: Execução headless H2H com `deepseek-flash`.
 - `codexseek --pro exec --skip-git-repo-check -s workspace-write -C "<dir>" "<tarefa>"`: Execução headless H2H com `deepseek-v4-pro`.
