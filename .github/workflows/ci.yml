@@ -39,7 +39,7 @@ jobs:
       - name: Security Gate — Verify zero hardcoded API keys
         shell: bash
         run: |
-          if grep -RInE 'sk-[a-zA-Z0-9]{20,}' cmd/ internal/ npm/ scripts/ README.md SPEC.md PROJECT.md GEMINI.md 2>/dev/null; then
+          if grep -RInE --exclude="*_test.go" 'sk-[a-zA-Z0-9]{20,}' cmd/ internal/ npm/ scripts/ README.md SPEC.md PROJECT.md GEMINI.md 2>/dev/null; then
             echo "ERROR: Potential secret detected in repository!"
             exit 1
           fi

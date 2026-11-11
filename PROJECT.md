@@ -84,5 +84,5 @@ codexseek --pro exec --skip-git-repo-check -s workspace-write -C "C:\caminho\pro
 ---
 
 ## 6. Estado Atual e Próximos Passos
-- **Estado Atual (2026-11-11, v1.1.0):** Concluído, testado e homologado em produção. Inclui consulta de saldo em tempo real (`codexseek balance` / `codexseek saldo`), Modo Recap automático com saldo (`codexseek recap`, `tui.auto_recap=true`, `/recap` e hook `turn-ended`), auditoria automática H2H (`~/.codexseek/h2h-usage.jsonl`), limpeza preventiva de pastas temporárias órfãs do NPM (`.codex-*`) no `codexseek update`, e GitHub Release com binários pré-compilados.
+- **Estado Atual (2026-11-11, v1.1.0):** Concluído, testado e homologado em produção. Inclui consulta de saldo em tempo real (`codexseek balance` / `codexseek saldo`), Modo Recap automático com saldo (`codexseek recap`, `tui.auto_recap=true`, `/recap` e hook `turn-ended`), auditoria automática H2H (`~/.codexseek/h2h-usage.jsonl`), limpeza preventiva de pastas temporárias órfãs do NPM (`.codex-*`) no `codexseek update`, GitHub Release com binários pré-compilados e correção do falso positivo no Security Gate do GitHub Actions (`ci.yml` + `config_test.go`).
 - **Problemas Conhecidos:** Nenhum. O atraso de ~25s que ocorria ao carregar plugins do Codex Desktop foi 100% eliminado no modo `exec` via injeção automática de `--ignore-user-config` + `-c windows.sandbox="unelevated"`.

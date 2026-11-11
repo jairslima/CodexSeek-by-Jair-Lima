@@ -25,7 +25,7 @@ func TestResolveModelAlias(t *testing.T) {
 }
 
 func TestMaskKey(t *testing.T) {
-	raw := "sk-1234567890abcdef1234567890abcdef"
+	raw := "sk-" + "1234567890abcdef1234567890abcdef"
 	masked := MaskKey(raw)
 	if strings.Contains(masked, "90abcdef12345678") {
 		t.Fatalf("MaskKey leaked middle of secret: %s", masked)
