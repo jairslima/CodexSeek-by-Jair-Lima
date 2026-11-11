@@ -33,7 +33,7 @@ func DefaultModels() []DeepSeekModelSpec {
 		{
 			Slug:            "deepseek-flash",
 			DisplayName:     "DeepSeek V4.1 Flash",
-			Description:     "Ultra-fast 1M context coding and reasoning model by DeepSeek.",
+			Description:     "Modelo ultrarrápido de 1M de contexto da DeepSeek para codificação, automação e raciocínio ágil.",
 			InputModalities: []string{"text", "image"},
 			ContextWindow:   1048576,
 			Priority:        1,
@@ -41,7 +41,7 @@ func DefaultModels() []DeepSeekModelSpec {
 		{
 			Slug:            "deepseek-v4-pro",
 			DisplayName:     "DeepSeek V4 Pro",
-			Description:     "Frontier deep reasoning and software engineering model by DeepSeek (1M context).",
+			Description:     "Modelo de fronteira da DeepSeek (1M de contexto) para arquitetura, engenharia de software e raciocínio profundo.",
 			InputModalities: []string{"text"},
 			ContextWindow:   1048576,
 			Priority:        2,
@@ -49,7 +49,7 @@ func DefaultModels() []DeepSeekModelSpec {
 		{
 			Slug:            "deepseek-chat",
 			DisplayName:     "DeepSeek Chat",
-			Description:     "General purpose and coding model by DeepSeek.",
+			Description:     "Modelo de propósito geral e codificação leve da DeepSeek (128k de contexto).",
 			InputModalities: []string{"text"},
 			ContextWindow:   128000,
 			Priority:        3,
@@ -57,7 +57,7 @@ func DefaultModels() []DeepSeekModelSpec {
 		{
 			Slug:            "deepseek-reasoner",
 			DisplayName:     "DeepSeek Reasoner",
-			Description:     "Chain-of-thought reasoning model by DeepSeek.",
+			Description:     "Modelo dedicado de cadeia de pensamento (Chain-of-Thought) da DeepSeek.",
 			InputModalities: []string{"text"},
 			ContextWindow:   128000,
 			Priority:        4,
@@ -84,8 +84,8 @@ func EnsureCatalog(codexBinPath, codexVersion, stateDir string, forceRebuild boo
 		safeVer = "latest"
 	}
 
-	// Schema revision v3 includes Recap + Balance instructions (with CODEXSEEK_BALANCE env & codexseek.exe balance --short)
-	catalogPath := filepath.Join(stateDir, fmt.Sprintf("deepseek_catalog_%s_r3.json", safeVer))
+	// Schema revision v4 includes pt-BR descriptions, reasoning levels, service tiers, and Recap + Balance instructions
+	catalogPath := filepath.Join(stateDir, fmt.Sprintf("deepseek_catalog_%s_r4.json", safeVer))
 	if !forceRebuild {
 		if info, err := os.Stat(catalogPath); err == nil && info.Size() > 1024 {
 			return catalogPath, nil
@@ -187,8 +187,9 @@ func extractEmbeddedCatalogFromBinary(binPath string) (map[string]any, error) {
 
 const codexSeekRecapInstructions = `
 
-## CodexSeek Recap & DeepSeek Balance Instructions (by Jair Lima)
-Whenever the user invokes ` + "`$recap`" + `, ` + "`/recap`" + `, asks for a recap/resumo da sessão, or when finishing a multi-step operational task, include a concise single-line recap at the end in Brazilian Portuguese with the live DeepSeek account balance (available in the environment variable ` + "`$env:CODEXSEEK_BALANCE`" + ` or by running ` + "`codexseek.exe balance --short`" + `):
+## Diretrizes de Idioma (pt-BR), Recap e Saldo DeepSeek (CodexSeek by Jair Lima)
+1. **Idioma Padrão:** Responda, atualize o progresso (` + "`commentary`" + `) e escreva resumos de raciocínio sempre em **português do Brasil**, com acentuação correta e sem usar travessão como pontuação (use vírgula, ponto ou dois-pontos).
+2. **Recap + Saldo DeepSeek:** Sempre que o usuário invocar ` + "`$recap`" + `, ` + "`/recap`" + `, pedir resumo/recap da sessão, ou ao concluir uma tarefa operacional, inclua ao final uma única linha em português com o saldo atual da conta DeepSeek (disponível na variável de ambiente ` + "`$env:CODEXSEEK_BALANCE`" + ` ou executando ` + "`codexseek.exe balance --short`" + `):
 ` + "`recap: <o que foi concluído>. Próximo passo: <ação concreta ou decisão pendente>. [Saldo DeepSeek: <valor USD>]`" + `
 `
 
@@ -240,6 +241,15 @@ func buildDeepSeekCatalogJSON(upstream map[string]any) ([]byte, error) {
 		clone["supports_search_tool"] = false
 		clone["upgrade"] = nil
 		clone["availability_nux"] = nil
+		clone["supported_reasoning_levels"] = []any{
+			map[string]any{"effort": "low", "description": "Respostas rápidas com raciocínio leve"},
+			map[string]any{"effort": "medium", "description": "Equilíbrio entre velocidade e profundidade para tarefas do dia a dia"},
+			map[string]any{"effort": "high", "description": "Maior profundidade de raciocínio para problemas complexos"},
+			map[string]any{"effort": "xhigh", "description": "Profundidade máxima de raciocínio para arquitetura e engenharia crítica"},
+		}
+		clone["service_tiers"] = []any{
+			map[string]any{"id": "priority", "name": "Rápido", "description": "Velocidade priorizada na API DeepSeek"},
+		}
 
 		if mm, ok := clone["model_messages"].(map[string]any); ok && mm != nil {
 			if tmpl, ok := mm["instructions_template"].(string); ok && tmpl != "" {
@@ -300,12 +310,13 @@ func buildFallbackTemplate() map[string]any {
 				"comp_hash":                         "2911",
 				"default_reasoning_summary":         "none",
 				"display_name":                      "DeepSeek V4.1 Flash",
-				"description":                       "DeepSeek coding model.",
+				"description":                       "Modelo ultrarrápido de 1M de contexto da DeepSeek para codificação, automação e raciocínio ágil.",
 				"default_reasoning_level":           "medium",
 				"supported_reasoning_levels": []any{
-					map[string]any{"effort": "low", "description": "Fast responses"},
-					map[string]any{"effort": "medium", "description": "Balanced reasoning"},
-					map[string]any{"effort": "high", "description": "Deep reasoning"},
+					map[string]any{"effort": "low", "description": "Respostas rápidas com raciocínio leve"},
+					map[string]any{"effort": "medium", "description": "Equilíbrio entre velocidade e profundidade para tarefas do dia a dia"},
+					map[string]any{"effort": "high", "description": "Maior profundidade de raciocínio para problemas complexos"},
+					map[string]any{"effort": "xhigh", "description": "Profundidade máxima de raciocínio para arquitetura e engenharia crítica"},
 				},
 				"shell_type":             "shell_command",
 				"visibility":             "list",
