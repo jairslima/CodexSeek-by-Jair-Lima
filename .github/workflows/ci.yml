@@ -48,7 +48,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "stable"
+          cache: false
 
       - name: Run Unit Tests
         run: go test ./... -v
