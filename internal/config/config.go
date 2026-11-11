@@ -18,7 +18,7 @@ import (
 
 const (
 	AppName        = "CodexSeek by Jair Lima"
-	AppVersion     = "1.0.0"
+	AppVersion     = "1.1.0"
 	DefaultModel   = "deepseek-flash"
 	ProModel       = "deepseek-v4-pro"
 	DefaultBaseURL = "https://api.deepseek.com/v1"
