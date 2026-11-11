@@ -1,0 +1,44 @@
+# Segredos, chaves e variáveis de ambiente (NUNCA versionar)
+.env
+.env.*
+*.env
+*.key
+*.pem
+*.pfx
+*.p12
+*.pkl
+secrets.*
+credentials.*
+auth.json
+*api_key*
+*apikey*
+
+# Configurações locais de usuário e estado de sessão
+.codex/
+.codexseek/
+config.local.toml
+*.local.json
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+
+# Binários compilados locais e pastas de build/dist
+dist/
+build/
+/bin/
+vendor/
+node_modules/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Logs e temporários
+*.log
+tmp/
+.tmp/
+.DS_Store
+Thumbs.db

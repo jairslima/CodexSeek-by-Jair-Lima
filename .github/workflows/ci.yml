@@ -1,0 +1,66 @@
+name: CI & Cross-Platform Build (CodexSeek by Jair Lima)
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test-and-build:
+    name: Test & Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            bin: codexseek-linux-amd64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            bin: codexseek-windows-amd64.exe
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            bin: codexseek-darwin-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Security Gate — Verify zero hardcoded API keys
+        shell: bash
+        run: |
+          if grep -RInE 'sk-[a-zA-Z0-9]{20,}' cmd/ internal/ npm/ scripts/ README.md SPEC.md PROJECT.md GEMINI.md 2>/dev/null; then
+            echo "ERROR: Potential secret detected in repository!"
+            exit 1
+          fi
+          echo "Security check passed: zero secrets in repository."
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Run Unit Tests
+        run: go test ./... -v
+
+      - name: Build Native Binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -ldflags="-s -w" -o dist/${{ matrix.bin }} ./cmd/codexseek
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.bin }}
+          path: dist/${{ matrix.bin }}

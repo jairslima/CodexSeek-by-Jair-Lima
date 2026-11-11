@@ -1,0 +1,26 @@
+{
+  "name": "codexseek-by-jair-lima",
+  "version": "1.0.0",
+  "description": "CodexSeek by Jair Lima: OpenAI Codex CLI harness pre-configured and optimized for the DeepSeek API (1M context window).",
+  "license": "MIT",
+  "author": "Jair Lima",
+  "bin": {
+    "codexseek": "bin/codexseek.mjs"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jairslima/CodexSeek-by-Jair-Lima.git"
+  },
+  "keywords": [
+    "codex",
+    "deepseek",
+    "codexseek",
+    "ai-agent",
+    "cli",
+    "h2h"
+  ]
+}

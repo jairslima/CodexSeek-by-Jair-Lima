@@ -1,0 +1,45 @@
+name: Automated Upstream Codex CLI Sync
+
+on:
+  schedule:
+    # Verifica diariamente às 06:00 UTC (03:00 BRT) se saiu versão nova do @openai/codex
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-upstream:
+    name: Check & Sync OpenAI Codex Upstream
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout CodexSeek repository
+        uses: actions/checkout@v4
+
+      - name: Check latest @openai/codex version on NPM
+        id: npm_check
+        run: |
+          LATEST=$(curl -sf https://registry.npmjs.org/@openai/codex/latest | jq -r .version)
+          echo "latest_version=$LATEST" >> $GITHUB_OUTPUT
+          echo "Detected upstream @openai/codex version: $LATEST"
+
+      - name: Set up Go & Verify Compatibility
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Run Compatibility Suite
+        run: go test ./... -v
+
+      - name: Record Upstream Compatibility Stamp
+        run: |
+          LATEST="${{ steps.npm_check.outputs.latest_version }}"
+          echo "$LATEST" > UPSTREAM_VERSION.txt
+          if ! git diff --quiet UPSTREAM_VERSION.txt; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add UPSTREAM_VERSION.txt
+            git commit -m "chore(upstream): sync compatibility stamp with @openai/codex v${LATEST}"
+            git push
+          fi

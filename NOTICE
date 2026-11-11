@@ -1,0 +1,15 @@
+CodexSeek by Jair Lima
+Copyright (c) 2026 Jair Lima
+
+This product includes software and specifications developed as part of the
+CodexSeek by Jair Lima project (https://github.com/jairslima/CodexSeek-by-Jair-Lima),
+licensed under the MIT License and Apache License 2.0.
+
+Upstream Attribution:
+This software builds upon and orchestrates the open-source OpenAI Codex CLI
+(https://github.com/openai/codex), Copyright OpenAI, licensed under the
+Apache License, Version 2.0.
+
+ Codename & Branding:
+"CodexSeek by Jair Lima" is an independent open-source project created by Jair Lima
+and is not affiliated with or endorsed by OpenAI or DeepSeek.
